@@ -724,6 +724,15 @@ package resolver's published-status probe both use this route. The proxy
 preserves draft content for existing share links; the resolver retains its
 published-status gate. Catalogue listing continues to use `/custom-guide-repository`.
 
+`GET /custom-guides` supplies the editor with complete InteractiveGuide resources,
+including all metadata and spec fields, through the same identity gate and caller-scoped
+OBO client. It drains pages of 100 resources with an 8 MiB page cap, a 32 MiB aggregate
+resource byte budget, a 50,000-item cap, and a 30-second aggregate deadline. Budget
+truncation is logged. Responses are `Cache-Control: no-store` and never cached
+across callers. Upstream 401 maps to 502; other upstream errors retain the single-item
+reader's mapping. The browser's existing optional-endpoint status handling remains
+unchanged. Editor writes continue to use App Platform directly.
+
 ## Operational diagnostics
 
 App Platform failures carry optional `diagnostics` alongside existing error/capability
@@ -734,7 +743,10 @@ queue behavior remain unchanged. A 503 is still retryable; its diagnostics ident
 failed hop. Token-exchange failure does not prove an invalid provisioned credential.
 
 The shared upstream client emits `event=pathfinder_proxy_failure` once per failed operation
-(including a completion refresh that serves stale data), not once per cached response.
+(including a completion refresh that serves stale data), not once per cached response or
+frontend retry: a retried settings read sends `?attempt=N`, and attempts after the first log
+`event=pathfinder_proxy_retry_failure` with `attempt` instead. A read whose first attempt never
+reaches the plugin (a gateway 502 or 504) logs only retry events, so the alert undercounts it.
 Expected settings absence, unsupported collection routes, idempotent write conflicts,
 and cancellations are excluded. Internal logs retain trusted
 stack and trace context; diagnostic responses never include tokens or upstream bodies.
@@ -847,5 +859,4 @@ provider that predates and sits outside the #1966 contract. That test is the aut
 rule's exact precision (how a conditional method, a url builder, or a variable-held request
 object is resolved); see it rather than this paragraph for the mechanics.
 
-One pre-existing direct read remains grandfathered in that test's allowlist, tracked for pay-down in
-[#1975](https://github.com/grafana/grafana-pathfinder-app/issues/1975).
+That test's allowlist is empty: no direct read is grandfathered, so any new one fails the test.
